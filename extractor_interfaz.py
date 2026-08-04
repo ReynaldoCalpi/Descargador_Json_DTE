@@ -30,8 +30,8 @@ if uploaded_file is not None:
                 sender = message.get('from', 'Desconocido')
                 date = message.get('date', 'Sin fecha')
                 
-                # Aquí puedes integrar tu lógica de parsing de DTE / XML / adjuntos
-                resultados.gespend = {"index": i, "subject": subject, "sender": sender, "date": date}
+                # Corrección del método append
+                resultados.append({"index": i, "subject": subject, "sender": sender, "date": date})
 
             st.info("Estructura lista para comenzar la extracción de datos.")
 
