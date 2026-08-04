@@ -1,6 +1,4 @@
-import streamlit as st
 import os
 import mailbox
 import json
-import pandas as pd
 extract-msg
