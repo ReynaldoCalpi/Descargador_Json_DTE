@@ -4,6 +4,8 @@ import extract_msg
 import json
 import pandas as pd
 import tempfile
+import zipfile
+import io
 
 # Configuración de página con branding profesional
 st.set_page_config(
@@ -73,6 +75,7 @@ else:
     # Botón de extracción y auditoría
     if st.button("🚀 Ejecutar Auditoría y Homogenización", type="primary"):
         auditoria_log = []
+        archivos_generados = {}  # Diccionario para almacenar los bytes y armar el ZIP
         progreso = st.progress(0)
         status_text = st.empty()
         
@@ -80,7 +83,7 @@ else:
             archivo_nombre = uploaded_file.name
             status_text.text(f"Auditando correo: {archivo_nombre}...")
             
-            # Guardamos temporalmente el archivo subido para que extract_msg pueda leerlo de forma segura
+            # Guardamos temporalmente el archivo subido para que extract_msg pueda leerlo
             with tempfile.NamedTemporaryFile(delete=False, suffix=".msg") as tmp_file:
                 tmp_file.write(uploaded_file.getvalue())
                 tmp_path = tmp_file.name
@@ -129,7 +132,7 @@ else:
                     except Exception:
                         pass
                 
-                # Naming estricto
+                # Naming estricto basado en código de generación
                 if codigo_generacion:
                     nombre_base_homogenizado = str(codigo_generacion)
                 else:
@@ -139,10 +142,14 @@ else:
                 guardado_pdf = "❌ Faltante"
                 
                 if datos_json_bytes:
-                    guardado_json = f"{nombre_base_homogenizado}.json"
+                    nuevo_nombre_json = f"{nombre_base_homogenizado}.json"
+                    archivos_generados[nuevo_nombre_json] = datos_json_bytes
+                    guardado_json = nuevo_nombre_json
                     
                 if datos_pdf_bytes:
-                    guardado_pdf = f"{nombre_base_homogenizado}.pdf"
+                    nuevo_nombre_pdf = f"{nombre_base_homogenizado}.pdf"
+                    archivos_generados[nuevo_nombre_pdf] = datos_pdf_bytes
+                    guardado_pdf = nuevo_nombre_pdf
                 
                 # Determinar estado de la auditoría
                 if datos_json_bytes and datos_pdf_bytes:
@@ -178,7 +185,15 @@ else:
         
         if auditoria_log:
             st.session_state['resultado_auditoria'] = pd.DataFrame(auditoria_log)
-            st.success("¡Auditoría y homogenización finalizada!")
+            
+            # Crear archivo ZIP comprimido con todos los archivos homogenizados en memoria
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                for nombre_archivo, contenido_bytes in archivos_generados.items():
+                    zf.writestr(nombre_archivo, contenido_bytes)
+            
+            st.session_state['zip_data'] = zip_buffer.getvalue()
+            st.success("¡Auditoría y homogenización finalizada con éxito!")
 
 # Mostrar visualización de resultados si existen
 if 'resultado_auditoria' in st.session_state:
@@ -186,6 +201,17 @@ if 'resultado_auditoria' in st.session_state:
     
     st.markdown("---")
     st.subheader("📋 Reporte de Auditoría y Control")
+    
+    # Botón dinámico para descargar todos los archivos homogenizados en un ZIP
+    if 'zip_data' in st.session_state:
+        st.download_button(
+            label="📥 Descargar Carpeta Homogenizada (ZIP con todos los JSON y PDF)",
+            data=st.session_state['zip_data'],
+            file_name="DTE_Homogenizados_Calpi.zip",
+            mime="application/zip",
+            type="primary"
+        )
+        st.markdown("<br>", unsafe_allow_html=True)
     
     # Métricas de control
     total_audits = len(df_auditoria)
@@ -208,4 +234,4 @@ if 'resultado_auditoria' in st.session_state:
     # Tabla de control interactiva
     st.dataframe(df_auditoria, use_container_width=True)
     
-    st.info("💡 **Análisis de Control Interno:** Toda factura válida comparte como nombre su Código de Generación único de 36 caracteres.")
+    st.info("💡 **Análisis de Control Interno:** Toda factura válida comparte como nombre su Código de Generación único de 36 caracteres dentro del archivo ZIP descargado.")
